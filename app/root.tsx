@@ -59,7 +59,6 @@ export default function App() {
         <Links />
       </head>
       <body>
-      <script src="https://js.puter.com/v2/"></script>
         <Outlet />
         <ScrollRestoration />
         <Scripts />
