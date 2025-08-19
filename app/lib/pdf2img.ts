@@ -5,49 +5,84 @@ export interface PdfConversionResult {
 }
 
 let pdfjsLib: any = null;
-let isLoading = false;
 let loadPromise: Promise<any> | null = null;
 
 async function loadPdfJs(): Promise<any> {
     if (pdfjsLib) return pdfjsLib;
     if (loadPromise) return loadPromise;
 
-    isLoading = true;
-    // @ts-expect-error - pdfjs-dist/build/pdf.mjs is not a module
-    loadPromise = import("pdfjs-dist/build/pdf.mjs").then((lib) => {
-        // Set the worker source to use local file
-        lib.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs";
-        pdfjsLib = lib;
-        isLoading = false;
-        return lib;
-    });
+    try {
+        loadPromise = import("pdfjs-dist").then(async (lib) => {
+            // Set the worker source to use local file
+            lib.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs";
+            pdfjsLib = lib;
+            return lib;
+        });
 
-    return loadPromise;
+        return await loadPromise;
+    } catch (error) {
+        console.error("Failed to load PDF.js:", error);
+        throw new Error("Failed to load PDF processing library");
+    }
 }
 
 export async function convertPdfToImage(
     file: File
 ): Promise<PdfConversionResult> {
     try {
+        if (!file || file.type !== 'application/pdf') {
+            return {
+                imageUrl: "",
+                file: null,
+                error: "Invalid file type. Please provide a PDF file.",
+            };
+        }
+
         const lib = await loadPdfJs();
+        
+        if (!lib) {
+            return {
+                imageUrl: "",
+                file: null,
+                error: "Failed to load PDF processing library",
+            };
+        }
 
         const arrayBuffer = await file.arrayBuffer();
-        const pdf = await lib.getDocument({ data: arrayBuffer }).promise;
+        
+        const loadingTask = lib.getDocument({ 
+            data: arrayBuffer,
+            cMapUrl: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.0.379/cmaps/',
+            cMapPacked: true,
+        });
+        
+        const pdf = await loadingTask.promise;
         const page = await pdf.getPage(1);
 
-        const viewport = page.getViewport({ scale: 4 });
+        const viewport = page.getViewport({ scale: 2.0 });
         const canvas = document.createElement("canvas");
         const context = canvas.getContext("2d");
+
+        if (!context) {
+            return {
+                imageUrl: "",
+                file: null,
+                error: "Failed to get canvas context",
+            };
+        }
 
         canvas.width = viewport.width;
         canvas.height = viewport.height;
 
-        if (context) {
-            context.imageSmoothingEnabled = true;
-            context.imageSmoothingQuality = "high";
-        }
+        context.imageSmoothingEnabled = true;
+        context.imageSmoothingQuality = "high";
 
-        await page.render({ canvasContext: context!, viewport }).promise;
+        const renderContext = {
+            canvasContext: context,
+            viewport: viewport,
+        };
+
+        await page.render(renderContext).promise;
 
         return new Promise((resolve) => {
             canvas.toBlob(
@@ -75,7 +110,7 @@ export async function convertPdfToImage(
                 1.0
             ); // Set quality to maximum (1.0)
         });
-    } catch (err) {
+    } catch (err: any) {
         return {
             imageUrl: "",
             file: null,
