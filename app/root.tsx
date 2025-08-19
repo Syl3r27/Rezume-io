@@ -26,12 +26,29 @@ export const links: Route.LinksFunction = () => [
 ];
 
 export function Layout({ children }: { children: React.ReactNode }) {
+  return (
+    <html lang="en">
+      <head>
+        <meta charSet="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <Meta />
+        <Links />
+      </head>
+      <body>
+      <script src="https://js.puter.com/v2/"></script>
+        {children}
+        <ScrollRestoration />
+        <Scripts />
+      </body>
+    </html>
+  );
+}
 
+export default function App() {
   const {init} = usePuterStore();
   useEffect(()=>{
     init()
   },[init])
-
 
   return (
     <html lang="en">
@@ -43,18 +60,12 @@ export function Layout({ children }: { children: React.ReactNode }) {
       </head>
       <body>
       <script src="https://js.puter.com/v2/"></script>
-
-
-        {children}
+        <Outlet />
         <ScrollRestoration />
         <Scripts />
       </body>
     </html>
   );
-}
-
-export default function App() {
-  return <Outlet />;
 }
 
 export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
